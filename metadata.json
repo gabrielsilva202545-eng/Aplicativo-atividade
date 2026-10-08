@@ -1,0 +1,6 @@
+{
+  "name": "PCP Master - Gestão e Planejamento da Produção",
+  "description": "Sistema ERP e PCP para planejamento, gestão e controle de produção, ficha técnica (BOM), capacidade produtiva, pedidos, ordens de produção em tempo real e relatórios.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
