@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Order, Client, Product, OrderItem, OrderStatus } from '../../types/pcp.ts';
-import { X, ShoppingBag, Plus, Trash2, Save } from 'lucide-react';
+import { X, ShoppingBag, Plus, Trash2, Save, AlertTriangle } from 'lucide-react';
 
 interface OrderModalProps {
   isOpen: boolean;
@@ -28,8 +28,10 @@ export const OrderModal: React.FC<OrderModalProps> = ({
   const [status, setStatus] = useState<OrderStatus>('confirmed');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
+    setFormError(null);
     if (order) {
       setOrderNumber(order.orderNumber);
       setClientId(order.clientId);
@@ -119,8 +121,9 @@ export const OrderModal: React.FC<OrderModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
     if (items.length === 0) {
-      alert('Adicione pelo menos um produto ao pedido.');
+      setFormError('Adicione pelo menos um produto ao pedido antes de salvar.');
       return;
     }
 
@@ -169,6 +172,12 @@ export const OrderModal: React.FC<OrderModalProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          {formError && (
+            <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-lg text-xs flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>{formError}</span>
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
             <div className="space-y-1">
               <label className="font-semibold text-slate-700">Número do Pedido</label>

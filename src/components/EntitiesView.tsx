@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Client, Supplier } from '../types/pcp.ts';
+import { ConfirmModal } from './modals/ConfirmModal.tsx';
 import {
   Users,
   Building,
@@ -36,22 +37,27 @@ export const EntitiesView: React.FC<EntitiesViewProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'clients' | 'suppliers'>('clients');
   const [searchTerm, setSearchTerm] = useState('');
+  const [partnerToDelete, setPartnerToDelete] = useState<{
+    id: string;
+    name: string;
+    type: 'client' | 'supplier';
+  } | null>(null);
 
   const filteredClients = clients.filter(
     (c) =>
-      c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.document.includes(searchTerm) ||
+      (c.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (c.code || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (c.document || '').includes(searchTerm) ||
       (c.tradeName && c.tradeName.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const filteredSuppliers = suppliers.filter(
     (s) =>
-      s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.document.includes(searchTerm) ||
+      (s.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (s.code || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (s.document || '').includes(searchTerm) ||
       (s.tradeName && s.tradeName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      s.materialsCategory.toLowerCase().includes(searchTerm.toLowerCase())
+      (s.materialsCategory && s.materialsCategory.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   return (
@@ -189,12 +195,10 @@ export const EntitiesView: React.FC<EntitiesViewProps> = ({
                             <Edit2 className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => {
-                              if (confirm(`Deseja realmente excluir o cliente ${c.name}?`)) {
-                                onDeleteClient(c.id);
-                              }
-                            }}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 rounded transition-colors"
+                            onClick={() =>
+                              setPartnerToDelete({ id: c.id, name: c.name, type: 'client' })
+                            }
+                            className="p-1.5 text-slate-400 hover:text-rose-600 rounded transition-colors cursor-pointer"
                             title="Excluir Cliente"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -268,12 +272,10 @@ export const EntitiesView: React.FC<EntitiesViewProps> = ({
                             <Edit2 className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => {
-                              if (confirm(`Deseja realmente excluir o fornecedor ${s.name}?`)) {
-                                onDeleteSupplier(s.id);
-                              }
-                            }}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 rounded transition-colors"
+                            onClick={() =>
+                              setPartnerToDelete({ id: s.id, name: s.name, type: 'supplier' })
+                            }
+                            className="p-1.5 text-slate-400 hover:text-rose-600 rounded transition-colors cursor-pointer"
                             title="Excluir Fornecedor"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -288,6 +290,40 @@ export const EntitiesView: React.FC<EntitiesViewProps> = ({
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={!!partnerToDelete}
+        title={
+          partnerToDelete?.type === 'client'
+            ? 'Excluir Cadastro de Cliente?'
+            : 'Excluir Cadastro de Fornecedor?'
+        }
+        message={
+          partnerToDelete
+            ? `Tem certeza que deseja excluir ${
+                partnerToDelete.type === 'client' ? 'o cliente' : 'o fornecedor'
+              } ${partnerToDelete.name}?`
+            : ''
+        }
+        confirmText={
+          partnerToDelete?.type === 'client' ? 'Sim, Excluir Cliente' : 'Sim, Excluir Fornecedor'
+        }
+        cancelText="Cancelar"
+        icon="trash"
+        isDanger={true}
+        onConfirm={async () => {
+          if (partnerToDelete) {
+            const { id, type } = partnerToDelete;
+            setPartnerToDelete(null);
+            if (type === 'client') {
+              await onDeleteClient(id);
+            } else {
+              await onDeleteSupplier(id);
+            }
+          }
+        }}
+        onCancel={() => setPartnerToDelete(null)}
+      />
     </div>
   );
 };

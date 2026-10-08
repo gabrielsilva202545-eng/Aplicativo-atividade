@@ -33,8 +33,8 @@ export const OpDetailModal: React.FC<OpDetailModalProps> = ({
 }) => {
   if (!isOpen || !op) return null;
 
-  const totalSteps = op.steps.length;
-  const completedSteps = op.steps.filter((s) => s.isCompleted).length;
+  const totalSteps = (op.steps || []).length;
+  const completedSteps = (op.steps || []).filter((s) => s.isCompleted).length;
   const progressPct = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
 
   return (
@@ -138,7 +138,7 @@ export const OpDetailModal: React.FC<OpDetailModalProps> = ({
               <span>Roteiro de Fabricação & Apontamento de Etapas</span>
             </h3>
             <div className="space-y-2">
-              {op.steps.map((st) => (
+              {(op.steps || []).map((st) => (
                 <div
                   key={st.stepNumber}
                   onClick={() => {
@@ -199,7 +199,7 @@ export const OpDetailModal: React.FC<OpDetailModalProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-700">
-                  {op.materialsRequired.map((mat) => (
+                  {(op.materialsRequired || []).map((mat) => (
                     <tr key={mat.rawMaterialId}>
                       <td className="py-1.5 px-3 font-mono font-medium">{mat.rawMaterialCode}</td>
                       <td className="py-1.5 px-3 font-medium">{mat.rawMaterialName}</td>

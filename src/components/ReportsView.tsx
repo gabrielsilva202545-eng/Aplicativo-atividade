@@ -273,7 +273,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                           </span>
                         </td>
                         <td className="py-2 px-3 text-[11px] text-slate-600 truncate max-w-[150px]">
-                          {op.technicalResponsible.split('-')[0].trim()}
+                          {op.technicalResponsible ? op.technicalResponsible.split('-')[0].trim() : '-'}
                         </td>
                       </tr>
                     ))

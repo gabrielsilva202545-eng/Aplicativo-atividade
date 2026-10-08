@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { RawMaterial, Supplier } from '../types/pcp.ts';
+import { ConfirmModal } from './modals/ConfirmModal.tsx';
 import {
   Boxes,
   Plus,
@@ -30,11 +31,12 @@ export const RawMaterialsView: React.FC<RawMaterialsViewProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [onlyLowStock, setOnlyLowStock] = useState(false);
+  const [materialToDelete, setMaterialToDelete] = useState<RawMaterial | null>(null);
 
   const filteredMaterials = rawMaterials.filter((m) => {
     const matchesSearch =
-      m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      m.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (m.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (m.code || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (m.location && m.location.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchesLowStock = !onlyLowStock || m.currentStock <= m.minStock;
@@ -223,16 +225,8 @@ export const RawMaterialsView: React.FC<RawMaterialsViewProps> = ({
                             <Edit2 className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => {
-                              if (
-                                confirm(
-                                  `Deseja realmente excluir a matéria-prima ${m.code} - ${m.name}?`
-                                )
-                              ) {
-                                onDeleteMaterial(m.id);
-                              }
-                            }}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 rounded transition-colors"
+                            onClick={() => setMaterialToDelete(m)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 rounded transition-colors cursor-pointer"
                             title="Excluir Matéria-Prima"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -247,6 +241,28 @@ export const RawMaterialsView: React.FC<RawMaterialsViewProps> = ({
           </table>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={!!materialToDelete}
+        title="Excluir Matéria-Prima?"
+        message={
+          materialToDelete
+            ? `Tem certeza que deseja excluir o insumo ${materialToDelete.code} - ${materialToDelete.name}? Isto pode impactar fichas técnicas cadastradas.`
+            : ''
+        }
+        confirmText="Sim, Excluir Matéria-Prima"
+        cancelText="Cancelar"
+        icon="trash"
+        isDanger={true}
+        onConfirm={async () => {
+          if (materialToDelete) {
+            const id = materialToDelete.id;
+            setMaterialToDelete(null);
+            await onDeleteMaterial(id);
+          }
+        }}
+        onCancel={() => setMaterialToDelete(null)}
+      />
     </div>
   );
 };

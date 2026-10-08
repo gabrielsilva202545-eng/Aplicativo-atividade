@@ -238,8 +238,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           ) : (
             <div className="space-y-3">
               {activeOps.slice(0, 4).map((op) => {
-                const totalSteps = op.steps.length;
-                const completedSteps = op.steps.filter((s) => s.isCompleted).length;
+                const totalSteps = (op.steps || []).length;
+                const completedSteps = (op.steps || []).filter((s) => s.isCompleted).length;
                 const progressPct = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
 
                 const statusLabelMap: Record<string, { text: string; color: string }> = {
@@ -462,7 +462,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         <span className="font-medium text-slate-900">{mov.itemName}</span>
                       </div>
                       <div className="text-[11px] text-slate-500 mt-0.5">
-                        {mov.notes} · Por: {mov.technicalResponsible.split('-')[0].trim()}
+                        {mov.notes} · Por: {mov.technicalResponsible ? mov.technicalResponsible.split('-')[0].trim() : 'PCP'}
                       </div>
                     </div>
                     <div className="font-mono font-bold text-slate-800 tabular-nums shrink-0">

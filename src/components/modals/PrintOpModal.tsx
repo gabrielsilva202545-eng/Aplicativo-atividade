@@ -22,8 +22,8 @@ export const PrintOpModal: React.FC<PrintOpModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-4xl my-8 overflow-hidden print-container">
+    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto print:static print:bg-transparent print:p-0 print:m-0 print:overflow-visible">
+      <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-4xl my-8 overflow-hidden print-container print:my-0 print:border-none print:shadow-none">
         {/* Modal Controls (No print) */}
         <div className="no-print px-6 py-3 border-b border-slate-200 flex items-center justify-between bg-slate-100">
           <div className="text-xs text-slate-600 font-medium flex items-center gap-2">
@@ -137,7 +137,7 @@ export const PrintOpModal: React.FC<PrintOpModalProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {op.materialsRequired.map((mat) => (
+                {(op.materialsRequired || []).map((mat) => (
                   <tr key={mat.rawMaterialId}>
                     <td className="py-1.5 px-2 font-mono text-[11px] border-r border-slate-200">
                       {mat.rawMaterialCode}
@@ -183,7 +183,7 @@ export const PrintOpModal: React.FC<PrintOpModalProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {op.steps.map((st) => (
+                {(op.steps || []).map((st) => (
                   <tr key={st.stepNumber}>
                     <td className="py-2 px-2 text-center font-bold font-mono border-r border-slate-200">
                       {st.stepNumber}

@@ -1242,16 +1242,30 @@ export class Database {
       updatedAt: now,
     };
 
-    // If linked to an order item, update the order status
-    if (data.orderId && data.orderItemId) {
+    // If linked to an order, link and update the order status
+    if (data.orderId) {
       const order = this.getOrderById(data.orderId);
       if (order) {
-        const item = order.items.find((i) => i.id === data.orderItemId);
+        const item = data.orderItemId
+          ? (order.items || []).find((i) => i.id === data.orderItemId)
+          : (order.items || []).find((i) => i.productId === data.productId);
         if (item) {
           item.productionOrderStatus = 'generated';
           item.productionOrderId = id;
-          order.status = 'in_production';
-          order.updatedAt = now;
+          newOP.orderItemId = item.id;
+        }
+        order.status = 'in_production';
+        order.updatedAt = now;
+      }
+    }
+
+    // Reserve stock for required materials
+    if (newOP.materialsRequired && Array.isArray(newOP.materialsRequired)) {
+      for (const mat of newOP.materialsRequired) {
+        const rawMat = this.getRawMaterialById(mat.rawMaterialId);
+        if (rawMat) {
+          rawMat.reservedStock = Number(((rawMat.reservedStock || 0) + (mat.requiredQuantity || 0)).toFixed(3));
+          rawMat.updatedAt = now;
         }
       }
     }
@@ -1274,8 +1288,42 @@ export class Database {
   }
 
   public deleteProductionOrder(id: string): boolean {
+    const op = this.getProductionOrderById(id);
+    if (!op) return false;
+
+    const now = new Date().toISOString();
+
+    // Release reserved stock if not yet completed/deducted
+    if (!op.stockDeducted && op.materialsRequired) {
+      for (const mat of op.materialsRequired) {
+        const rawMat = this.getRawMaterialById(mat.rawMaterialId);
+        if (rawMat) {
+          rawMat.reservedStock = Math.max(0, Number(((rawMat.reservedStock || 0) - (mat.requiredQuantity || 0)).toFixed(3)));
+          rawMat.updatedAt = now;
+        }
+      }
+    }
+
+    // If linked to order, revert item status
+    if (op.orderId) {
+      const order = this.getOrderById(op.orderId);
+      if (order) {
+        const item = (order.items || []).find((i) => i.productionOrderId === id || i.id === op.orderItemId);
+        if (item) {
+          item.productionOrderStatus = 'none';
+          item.productionOrderId = null;
+        }
+        // Check if any other items in production
+        const hasOtherOps = (order.items || []).some((i) => i.productionOrderStatus === 'generated');
+        if (!hasOtherOps && order.status === 'in_production') {
+          order.status = 'confirmed';
+        }
+        order.updatedAt = now;
+      }
+    }
+
     const initialLen = this.data.productionOrders.length;
-    this.data.productionOrders = this.data.productionOrders.filter((op) => op.id !== id);
+    this.data.productionOrders = this.data.productionOrders.filter((o) => o.id !== id);
     const deleted = this.data.productionOrders.length < initialLen;
     if (deleted) this.save();
     return deleted;
@@ -1307,12 +1355,13 @@ export class Database {
     const shouldDeduct = payload.deductStock !== false && !op.stockDeducted;
 
     if (shouldDeduct) {
-      // 1. Abater matérias-primas do estoque
-      for (const mat of op.materialsRequired) {
+      // 1. Abater matérias-primas do estoque e desonerar estoque reservado
+      for (const mat of op.materialsRequired || []) {
         const rawMat = this.getRawMaterialById(mat.rawMaterialId);
         if (rawMat) {
           const qtyToDeduct = Number(mat.requiredQuantity) || 0;
           rawMat.currentStock = Math.max(0, Number((rawMat.currentStock - qtyToDeduct).toFixed(3)));
+          rawMat.reservedStock = Math.max(0, Number(((rawMat.reservedStock || 0) - qtyToDeduct).toFixed(3)));
           rawMat.updatedAt = now;
 
           // Registrar movimentação de consumo
@@ -1326,7 +1375,7 @@ export class Database {
             unit: rawMat.unit,
             referenceType: 'PRODUCTION_ORDER',
             referenceId: op.id,
-            technicalResponsible: payload.technicalResponsible,
+            technicalResponsible: payload.technicalResponsible || op.technicalResponsible || 'Responsável Técnico',
             notes: `Consumo apontado na conclusão da ${op.code} (${op.productName})`,
             timestamp: now,
           });
@@ -1337,7 +1386,7 @@ export class Database {
       const product = this.getProductById(op.productId);
       if (product) {
         const qtyToAdd = Number(payload.quantityProduced) || op.quantityPlanned;
-        product.currentStock = Number((product.currentStock + qtyToAdd).toFixed(2));
+        product.currentStock = Number(((product.currentStock || 0) + qtyToAdd).toFixed(2));
         product.updatedAt = now;
 
         // Registrar movimentação de entrada
@@ -1351,7 +1400,7 @@ export class Database {
           unit: product.unit,
           referenceType: 'PRODUCTION_ORDER',
           referenceId: op.id,
-          technicalResponsible: payload.technicalResponsible,
+          technicalResponsible: payload.technicalResponsible || op.technicalResponsible || 'Responsável Técnico',
           notes: `Entrada de produção concluída da ${op.code} - Lote ${op.batchNumber}`,
           timestamp: now,
         });
@@ -1365,28 +1414,30 @@ export class Database {
     op.quantityProduced = payload.quantityProduced;
     op.quantityScrapped = payload.quantityScrapped;
     op.completionNotes = payload.completionNotes || null;
-    op.technicalResponsible = payload.technicalResponsible;
+    op.technicalResponsible = payload.technicalResponsible || op.technicalResponsible || 'Responsável Técnico';
     op.actualEndDate = now;
     op.updatedAt = now;
 
     // Concluir todas as etapas caso alguma estivesse pendente
-    op.steps.forEach((s) => {
+    (op.steps || []).forEach((s) => {
       if (!s.isCompleted) {
         s.isCompleted = true;
         s.completedAt = now;
-        s.operatorName = s.operatorName || payload.technicalResponsible.split('-')[0].trim();
+        s.operatorName = s.operatorName || (op.technicalResponsible ? op.technicalResponsible.split('-')[0].trim() : 'Operador');
       }
     });
 
     // Se estiver vinculada a um pedido, verificar se todos os itens foram concluídos
-    if (op.orderId && op.orderItemId) {
+    if (op.orderId) {
       const order = this.getOrderById(op.orderId);
       if (order) {
-        const item = order.items.find((i) => i.id === op.orderItemId);
+        const item = op.orderItemId
+          ? (order.items || []).find((i) => i.id === op.orderItemId)
+          : (order.items || []).find((i) => i.productId === op.productId);
         if (item) {
           item.productionOrderStatus = 'completed';
         }
-        const allCompleted = order.items.every((i) => i.productionOrderStatus === 'completed');
+        const allCompleted = (order.items || []).every((i) => i.productionOrderStatus === 'completed');
         if (allCompleted) {
           order.status = 'ready';
         }

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Workstation, ProductionOrder } from '../types/pcp.ts';
+import { ConfirmModal } from './modals/ConfirmModal.tsx';
 import {
   Gauge,
   Plus,
@@ -28,6 +29,7 @@ export const WorkstationsView: React.FC<WorkstationsViewProps> = ({
   onDeleteWorkstation,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [workstationToDelete, setWorkstationToDelete] = useState<Workstation | null>(null);
 
   const activeOps = productionOrders.filter(
     (op) => op.status !== 'completed' && op.status !== 'cancelled'
@@ -35,9 +37,9 @@ export const WorkstationsView: React.FC<WorkstationsViewProps> = ({
 
   const filteredWorkstations = workstations.filter(
     (w) =>
-      w.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      w.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      w.sector.toLowerCase().includes(searchTerm.toLowerCase())
+      (w.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (w.code || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (w.sector || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   // Overall plant capacity stats
@@ -161,16 +163,8 @@ export const WorkstationsView: React.FC<WorkstationsViewProps> = ({
                     <Edit2 className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={() => {
-                      if (
-                        confirm(
-                          `Deseja realmente excluir o posto de trabalho ${w.code} - ${w.name}?`
-                        )
-                      ) {
-                        onDeleteWorkstation(w.id);
-                      }
-                    }}
-                    className="p-1.5 text-slate-400 hover:text-rose-600 rounded transition-colors"
+                    onClick={() => setWorkstationToDelete(w)}
+                    className="p-1.5 text-slate-400 hover:text-rose-600 rounded transition-colors cursor-pointer"
                     title="Excluir Posto"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -264,6 +258,28 @@ export const WorkstationsView: React.FC<WorkstationsViewProps> = ({
           );
         })}
       </div>
+
+      <ConfirmModal
+        isOpen={!!workstationToDelete}
+        title="Excluir Posto de Trabalho?"
+        message={
+          workstationToDelete
+            ? `Tem certeza que deseja excluir o posto de trabalho ${workstationToDelete.code} - ${workstationToDelete.name}? Isto afetará o cálculo de capacidade produtiva das rotas associadas.`
+            : ''
+        }
+        confirmText="Sim, Excluir Posto"
+        cancelText="Cancelar"
+        icon="trash"
+        isDanger={true}
+        onConfirm={async () => {
+          if (workstationToDelete) {
+            const id = workstationToDelete.id;
+            setWorkstationToDelete(null);
+            await onDeleteWorkstation(id);
+          }
+        }}
+        onCancel={() => setWorkstationToDelete(null)}
+      />
     </div>
   );
 };

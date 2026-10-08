@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Order, Client, Product, OrderItem } from '../types/pcp.ts';
+import { ConfirmModal } from './modals/ConfirmModal.tsx';
 import {
   ShoppingBag,
   Plus,
@@ -35,12 +36,13 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
 
   const filteredOrders = orders.filter((ord) => {
     const matchesSearch =
-      ord.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (ord.orderNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (ord.clientName && ord.clientName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      ord.items.some((it) => it.productName?.toLowerCase().includes(searchTerm.toLowerCase()));
+      (ord.items || []).some((it) => it.productName?.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchesStatus = statusFilter === 'all' || ord.status === statusFilter;
     return matchesSearch && matchesStatus;
@@ -148,7 +150,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                     </div>
 
                     <div className="font-mono font-bold text-slate-900 text-sm">
-                      R$ {ord.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      R$ {(ord.totalAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </div>
 
                     <div className="flex items-center gap-1 pl-2 border-l border-slate-200">
@@ -160,16 +162,8 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                         <Edit2 className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        onClick={() => {
-                          if (
-                            confirm(
-                              `Deseja realmente excluir o pedido ${ord.orderNumber}?`
-                            )
-                          ) {
-                            onDeleteOrder(ord.id);
-                          }
-                        }}
-                        className="p-1 text-slate-400 hover:text-rose-600 rounded transition-colors"
+                        onClick={() => setOrderToDelete(ord)}
+                        className="p-1 text-slate-400 hover:text-rose-600 rounded transition-colors cursor-pointer"
                         title="Excluir Pedido"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -192,7 +186,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50 text-slate-700">
-                      {ord.items.map((item) => {
+                      {(ord.items || []).map((item) => {
                         const hasOp = item.productionOrderStatus !== 'none';
                         const isCompleted = item.productionOrderStatus === 'completed';
 
@@ -275,6 +269,28 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
           })
         )}
       </div>
+
+      <ConfirmModal
+        isOpen={!!orderToDelete}
+        title="Excluir Pedido de Venda?"
+        message={
+          orderToDelete
+            ? `Tem certeza que deseja excluir o pedido ${orderToDelete.orderNumber} (${orderToDelete.clientName}) no valor de R$ ${(orderToDelete.totalAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}?`
+            : ''
+        }
+        confirmText="Sim, Excluir Pedido"
+        cancelText="Cancelar"
+        icon="trash"
+        isDanger={true}
+        onConfirm={async () => {
+          if (orderToDelete) {
+            const id = orderToDelete.id;
+            setOrderToDelete(null);
+            await onDeleteOrder(id);
+          }
+        }}
+        onCancel={() => setOrderToDelete(null)}
+      />
     </div>
   );
 };

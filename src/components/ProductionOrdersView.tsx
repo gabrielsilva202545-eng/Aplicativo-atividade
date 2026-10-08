@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ProductionOrder, ProductionOrderStatus } from '../types/pcp.ts';
 import { ProductionKanbanView } from './ProductionKanbanView.tsx';
+import { ConfirmModal } from './modals/ConfirmModal.tsx';
 import {
   Kanban,
   Table as TableIcon,
@@ -38,6 +39,7 @@ export const ProductionOrdersView: React.FC<ProductionOrdersViewProps> = ({
   const [activeTab, setActiveTab] = useState<'kanban' | 'table'>('kanban');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [opToDelete, setOpToDelete] = useState<ProductionOrder | null>(null);
 
   const filteredOrders = productionOrders.filter((op) => {
     const matchesSearch =
@@ -218,7 +220,7 @@ export const ProductionOrdersView: React.FC<ProductionOrdersViewProps> = ({
                           </span>
                         </td>
                         <td className="py-3 px-4 text-[11px] text-slate-600 truncate max-w-[160px]">
-                          {op.technicalResponsible.split('-')[0].trim()}
+                          {op.technicalResponsible ? op.technicalResponsible.split('-')[0].trim() : '-'}
                         </td>
                         <td className="py-3 px-4 text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-1.5">
@@ -242,16 +244,8 @@ export const ProductionOrdersView: React.FC<ProductionOrdersViewProps> = ({
                             )}
 
                             <button
-                              onClick={() => {
-                                if (
-                                  confirm(
-                                    `Tem certeza que deseja excluir a Ordem de Produção ${op.code}?`
-                                  )
-                                ) {
-                                  onDeleteOp(op.id);
-                                }
-                              }}
-                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
+                              onClick={() => setOpToDelete(op)}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
                               title="Excluir Ordem de Produção"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -267,6 +261,28 @@ export const ProductionOrdersView: React.FC<ProductionOrdersViewProps> = ({
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={!!opToDelete}
+        title="Excluir Ordem de Produção?"
+        message={
+          opToDelete
+            ? `Tem certeza que deseja excluir permanentemente a Ordem de Produção ${opToDelete.code} (${opToDelete.productName})? O estoque reservado será liberado.`
+            : ''
+        }
+        confirmText="Sim, Excluir OP"
+        cancelText="Cancelar"
+        icon="trash"
+        isDanger={true}
+        onConfirm={async () => {
+          if (opToDelete) {
+            const id = opToDelete.id;
+            setOpToDelete(null);
+            await onDeleteOp(id);
+          }
+        }}
+        onCancel={() => setOpToDelete(null)}
+      />
     </div>
   );
 };

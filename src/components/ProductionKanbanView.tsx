@@ -202,8 +202,8 @@ export const ProductionKanbanView: React.FC<ProductionKanbanViewProps> = ({
                 ) : (
                   colOrders.map((op) => {
                     const isExpanded = !!expandedCards[op.id];
-                    const totalSteps = op.steps.length;
-                    const completedSteps = op.steps.filter((s) => s.isCompleted).length;
+                    const totalSteps = (op.steps || []).length;
+                    const completedSteps = (op.steps || []).filter((s) => s.isCompleted).length;
                     const progressPct =
                       totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
 
@@ -290,7 +290,7 @@ export const ProductionKanbanView: React.FC<ProductionKanbanViewProps> = ({
                             <div className="font-semibold text-slate-700 text-[10px] uppercase tracking-wider">
                               Roteiro de Produção:
                             </div>
-                            {op.steps.map((st) => (
+                            {(op.steps || []).map((st) => (
                               <div
                                 key={st.stepNumber}
                                 onClick={(e) => {

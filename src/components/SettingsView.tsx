@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CompanySettings } from '../types/pcp.ts';
 import {
   Settings,
@@ -10,6 +10,7 @@ import {
   Download,
   CheckCircle,
 } from 'lucide-react';
+import { ConfirmModal } from './modals/ConfirmModal.tsx';
 
 interface SettingsViewProps {
   settings: CompanySettings | null;
@@ -41,6 +42,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState(false);
+  const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
+
+  useEffect(() => {
+    if (settings) {
+      setFormData(settings);
+    }
+  }, [settings]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -250,15 +258,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </a>
 
           <button
-            onClick={async () => {
-              if (
-                confirm(
-                  'ATENÇÃO: Deseja realmente restaurar os dados de demonstração da fábrica? Suas alterações manuais serão resetadas para o modelo padrão.'
-                )
-              ) {
-                await onResetDatabase();
-              }
-            }}
+            onClick={() => setIsResetConfirmOpen(true)}
             className="px-3.5 py-2 text-xs font-medium text-rose-700 bg-white border border-rose-200 hover:bg-rose-50 rounded-lg transition-colors inline-flex items-center gap-1.5 shadow-2xs cursor-pointer"
           >
             <RotateCcw className="w-3.5 h-3.5 text-rose-600" />
@@ -266,6 +266,21 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </button>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={isResetConfirmOpen}
+        title="Restaurar Banco de Dados da Fábrica?"
+        message="ATENÇÃO: Todas as alterações manuais (produtos, ordens, pedidos e matérias-primas) serão resetadas para o modelo padrão da demonstração. Esta ação não pode ser desfeita."
+        confirmText="Sim, Restaurar Banco"
+        cancelText="Cancelar"
+        icon="reset"
+        isDanger={true}
+        onConfirm={async () => {
+          setIsResetConfirmOpen(false);
+          await onResetDatabase();
+        }}
+        onCancel={() => setIsResetConfirmOpen(false)}
+      />
     </div>
   );
 };

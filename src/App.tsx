@@ -359,7 +359,11 @@ export default function App() {
         />
 
         {/* Content Viewport */}
-        <main className="flex-1 p-6 overflow-y-auto max-h-[calc(100vh-4rem)]">
+        <main
+          className={`flex-1 p-6 overflow-y-auto max-h-[calc(100vh-4rem)] ${
+            selectedOpForPrint ? 'no-print' : ''
+          }`}
+        >
           {error && (
             <div className="mb-4 p-4 bg-rose-50 border border-rose-200 text-rose-800 rounded-lg text-xs">
               <strong>Erro:</strong> {error}

@@ -60,32 +60,40 @@ export const CreateOpModal: React.FC<CreateOpModalProps> = ({
   const [notes, setNotes] = useState<string>('');
   const [technicalResponsible, setTechnicalResponsible] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Initialize or update fields when modal opens or initial props change
   useEffect(() => {
-    if (initialProductId) setSelectedProductId(initialProductId);
-    if (initialOrderId) setSelectedOrderId(initialOrderId);
-    if (initialOrderItemId) setSelectedOrderItemId(initialOrderItemId);
-    if (initialQuantity) setQuantityPlanned(initialQuantity);
+    if (isOpen) {
+      setFormError(null);
+      if (initialProductId) {
+        setSelectedProductId(initialProductId);
+      } else if (products.length > 0) {
+        setSelectedProductId(products[0].id);
+      }
+      setSelectedOrderId(initialOrderId || '');
+      setSelectedOrderItemId(initialOrderItemId || '');
+      setQuantityPlanned(initialQuantity || 10);
 
-    const now = new Date();
-    const ym = `${now.getFullYear().toString().slice(-2)}${(now.getMonth() + 1).toString().padStart(2, '0')}`;
-    setBatchNumber(`LOT-${ym}-${Math.floor(Math.random() * 90 + 10)}`);
+      const now = new Date();
+      const ym = `${now.getFullYear().toString().slice(-2)}${(now.getMonth() + 1).toString().padStart(2, '0')}`;
+      setBatchNumber(`LOT-${ym}-${Math.floor(Math.random() * 90 + 10)}`);
 
-    if (settings) {
-      setTechnicalResponsible(
-        `${settings.technicalResponsibleName} - ${settings.technicalResponsibleRegistry}`
-      );
+      if (settings) {
+        setTechnicalResponsible(
+          `${settings.technicalResponsibleName} - ${settings.technicalResponsibleRegistry}`
+        );
+      }
     }
-  }, [isOpen, initialProductId, initialOrderId, initialOrderItemId, initialQuantity, settings]);
+  }, [isOpen, initialProductId, initialOrderId, initialOrderItemId, initialQuantity, settings, products]);
 
-  const selectedProduct = products.find((p) => p.id === selectedProductId);
+  const selectedProduct = products.find((p) => p.id === selectedProductId) || products[0];
   const selectedWorkstation = workstations.find((w) => w.id === selectedProduct?.workstationId);
 
   // Calculate process hours and estimated end date automatically
   useEffect(() => {
     if (!selectedProduct) return;
-    const totalMinutes = selectedProduct.processTimeMinutes * (quantityPlanned || 1);
+    const totalMinutes = (selectedProduct.processTimeMinutes || 30) * (quantityPlanned || 1);
     const processHours = totalMinutes / 60;
 
     // Daily capacity in workstation or standard company hours
@@ -101,11 +109,11 @@ export const CreateOpModal: React.FC<CreateOpModalProps> = ({
 
   // Calculate required materials based on BOM
   const requiredMaterials: OpMaterialRequirement[] = selectedProduct
-    ? selectedProduct.bom.map((bomItem) => {
+    ? (selectedProduct.bom || []).map((bomItem) => {
         const rawMat = rawMaterials.find((m) => m.id === bomItem.rawMaterialId);
         const scrapMultiplier = 1 + (bomItem.scrapRatePercent || 0) / 100;
         const totalQty = Number(
-          (bomItem.quantityPerUnit * (quantityPlanned || 1) * scrapMultiplier).toFixed(3)
+          ((bomItem.quantityPerUnit || 1) * (quantityPlanned || 1) * scrapMultiplier).toFixed(3)
         );
         const currentStock = rawMat?.currentStock || 0;
         const isAvailable = currentStock >= totalQty;
@@ -115,7 +123,7 @@ export const CreateOpModal: React.FC<CreateOpModalProps> = ({
           rawMaterialId: bomItem.rawMaterialId,
           rawMaterialName: rawMat?.name || bomItem.rawMaterialName || 'Insumo',
           rawMaterialCode: rawMat?.code || bomItem.rawMaterialCode || '-',
-          unit: bomItem.unit,
+          unit: bomItem.unit || rawMat?.unit || 'UN',
           requiredQuantity: totalQty,
           unitCost,
           totalCost: Number((totalQty * unitCost).toFixed(2)),
@@ -127,28 +135,59 @@ export const CreateOpModal: React.FC<CreateOpModalProps> = ({
 
   const hasMissingStock = requiredMaterials.some((m) => !m.isAvailable);
   const totalProcessHours = selectedProduct
-    ? Number(((selectedProduct.processTimeMinutes * quantityPlanned) / 60).toFixed(2))
+    ? Number((((selectedProduct.processTimeMinutes || 30) * quantityPlanned) / 60).toFixed(2))
     : 0;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedProduct) return;
+    setFormError(null);
+    if (!selectedProduct) {
+      setFormError('Cadastre um produto com ficha técnica antes de emitir uma Ordem de Produção.');
+      return;
+    }
 
     setSubmitting(true);
     try {
       const selectedOrder = orders.find((o) => o.id === selectedOrderId);
 
-      // Create steps clone from product manufacturing steps
-      const steps = selectedProduct.manufacturingSteps.map((st) => {
-        const wst = workstations.find((w) => w.id === st.workstationId);
-        return {
-          stepNumber: st.stepNumber,
-          title: st.title,
-          workstationName: wst?.name || 'Fábrica Geral',
-          standardTimeMinutes: st.standardTimeMinutes * quantityPlanned,
-          isCompleted: false,
-        };
-      });
+      // Create steps clone from product manufacturing steps or default 3-stage process
+      const hasDefinedSteps =
+        selectedProduct.manufacturingSteps && selectedProduct.manufacturingSteps.length > 0;
+
+      const steps = hasDefinedSteps
+        ? selectedProduct.manufacturingSteps.map((st) => {
+            const wst = workstations.find((w) => w.id === st.workstationId);
+            return {
+              stepNumber: st.stepNumber,
+              title: st.title,
+              workstationName: wst?.name || 'Fábrica Geral',
+              standardTimeMinutes: (st.standardTimeMinutes || 10) * quantityPlanned,
+              isCompleted: false,
+            };
+          })
+        : [
+            {
+              stepNumber: 1,
+              title: 'Separação e preparação de matérias-primas',
+              workstationName: selectedWorkstation?.name || 'Preparação',
+              standardTimeMinutes: Math.max(10, Math.round((selectedProduct.processTimeMinutes || 30) * 0.3 * quantityPlanned)),
+              isCompleted: false,
+            },
+            {
+              stepNumber: 2,
+              title: 'Processamento, usinagem e montagem principal',
+              workstationName: selectedWorkstation?.name || 'Linha Principal',
+              standardTimeMinutes: Math.max(15, Math.round((selectedProduct.processTimeMinutes || 30) * 0.5 * quantityPlanned)),
+              isCompleted: false,
+            },
+            {
+              stepNumber: 3,
+              title: 'Inspeção de qualidade e embalagem',
+              workstationName: 'Controle de Qualidade',
+              standardTimeMinutes: Math.max(5, Math.round((selectedProduct.processTimeMinutes || 30) * 0.2 * quantityPlanned)),
+              isCompleted: false,
+            },
+          ];
 
       const opCode = `OP-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`;
 
@@ -208,6 +247,13 @@ export const CreateOpModal: React.FC<CreateOpModalProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          {formError && (
+            <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-lg text-xs flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>{formError}</span>
+            </div>
+          )}
+
           {/* Top Form Fields */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
             {/* Product Select */}
@@ -248,10 +294,22 @@ export const CreateOpModal: React.FC<CreateOpModalProps> = ({
               <select
                 value={selectedOrderId}
                 onChange={(e) => {
-                  setSelectedOrderId(e.target.value);
-                  const ord = orders.find((o) => o.id === e.target.value);
-                  if (ord && ord.items[0]) {
-                    setSelectedOrderItemId(ord.items[0].id);
+                  const newOrderId = e.target.value;
+                  setSelectedOrderId(newOrderId);
+                  if (newOrderId) {
+                    const ord = orders.find((o) => o.id === newOrderId);
+                    if (ord && ord.items && ord.items[0]) {
+                      const firstItem = ord.items[0];
+                      setSelectedOrderItemId(firstItem.id);
+                      if (firstItem.productId) {
+                        setSelectedProductId(firstItem.productId);
+                      }
+                      if (firstItem.quantity) {
+                        setQuantityPlanned(firstItem.quantity);
+                      }
+                    }
+                  } else {
+                    setSelectedOrderItemId('');
                   }
                 }}
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-700"

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Product, RawMaterial, Workstation } from '../types/pcp.ts';
+import { ConfirmModal } from './modals/ConfirmModal.tsx';
 import {
   Layers,
   Plus,
@@ -36,6 +37,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedProducts, setExpandedProducts] = useState<Record<string, boolean>>({});
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
 
   const toggleExpand = (id: string) => {
     setExpandedProducts((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -43,9 +45,9 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
 
   const filteredProducts = products.filter(
     (p) =>
-      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.category.toLowerCase().includes(searchTerm.toLowerCase())
+      (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (p.code || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (p.category || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -97,7 +99,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
             const workstation = workstations.find((w) => w.id === p.workstationId);
 
             // Compute total BOM material cost per unit
-            const totalMaterialCost = p.bom.reduce((acc, item) => {
+            const totalMaterialCost = (p.bom || []).reduce((acc, item) => {
               const mat = rawMaterials.find((m) => m.id === item.rawMaterialId);
               const cost = mat ? mat.unitCost * item.quantityPerUnit * (1 + (item.scrapRatePercent || 0) / 100) : 0;
               return acc + cost;
@@ -190,15 +192,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                       </button>
 
                       <button
-                        onClick={() => {
-                          if (
-                            confirm(
-                              `Deseja realmente excluir o produto ${p.code} - ${p.name}?`
-                            )
-                          ) {
-                            onDeleteProduct(p.id);
-                          }
-                        }}
+                        onClick={() => setProductToDelete(p)}
                         className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                         title="Excluir Produto"
                       >
@@ -231,7 +225,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                           <span>Composição de Matérias-Primas (BOM por Unidade Produzida)</span>
                         </h4>
                         <span className="text-[11px] text-slate-500 font-mono">
-                          {p.bom.length} componente(s) cadastrado(s)
+                          {(p.bom || []).length} componente(s) cadastrado(s)
                         </span>
                       </div>
 
@@ -249,7 +243,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100 text-slate-700">
-                            {p.bom.map((item) => {
+                            {(p.bom || []).map((item) => {
                               const rawMat = rawMaterials.find((m) => m.id === item.rawMaterialId);
                               const cost = rawMat ? rawMat.unitCost : 0;
                               const totalItemCost =
@@ -299,7 +293,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                        {p.manufacturingSteps.map((step) => {
+                        {(p.manufacturingSteps || []).map((step) => {
                           const wst = workstations.find((w) => w.id === step.workstationId);
 
                           return (
@@ -349,6 +343,28 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
           })
         )}
       </div>
+
+      <ConfirmModal
+        isOpen={!!productToDelete}
+        title="Excluir Produto & Ficha Técnica?"
+        message={
+          productToDelete
+            ? `Tem certeza que deseja excluir o produto ${productToDelete.code} - ${productToDelete.name}? Isto também removerá sua Ficha Técnica (BOM) e roteiro produtivo.`
+            : ''
+        }
+        confirmText="Sim, Excluir Produto"
+        cancelText="Cancelar"
+        icon="trash"
+        isDanger={true}
+        onConfirm={async () => {
+          if (productToDelete) {
+            const id = productToDelete.id;
+            setProductToDelete(null);
+            await onDeleteProduct(id);
+          }
+        }}
+        onCancel={() => setProductToDelete(null)}
+      />
     </div>
   );
 };

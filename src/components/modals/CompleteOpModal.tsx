@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ProductionOrder, CompanySettings } from '../../types/pcp.ts';
 import {
   X,
@@ -30,18 +30,26 @@ export const CompleteOpModal: React.FC<CompleteOpModalProps> = ({
   settings,
   onComplete,
 }) => {
-  if (!isOpen || !op) return null;
-
-  const [quantityProduced, setQuantityProduced] = useState<number>(op.quantityPlanned);
+  const [quantityProduced, setQuantityProduced] = useState<number>(op?.quantityPlanned || 0);
   const [quantityScrapped, setQuantityScrapped] = useState<number>(0);
   const [completionNotes, setCompletionNotes] = useState<string>('');
-  const [technicalResponsible, setTechnicalResponsible] = useState<string>(
-    settings
-      ? `${settings.technicalResponsibleName} - ${settings.technicalResponsibleRegistry}`
-      : op.technicalResponsible
-  );
+  const [technicalResponsible, setTechnicalResponsible] = useState<string>('');
   const [deductStock, setDeductStock] = useState<boolean>(true);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (op && isOpen) {
+      setQuantityProduced(op.quantityPlanned);
+      setQuantityScrapped(0);
+      setCompletionNotes('');
+      setTechnicalResponsible(
+        settings
+          ? `${settings.technicalResponsibleName} - ${settings.technicalResponsibleRegistry}`
+          : op.technicalResponsible || 'Responsável Técnico'
+      );
+      setDeductStock(true);
+    }
+  }, [op, settings, isOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,6 +67,8 @@ export const CompleteOpModal: React.FC<CompleteOpModalProps> = ({
       setSubmitting(false);
     }
   };
+
+  if (!isOpen || !op) return null;
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
